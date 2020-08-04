@@ -3,14 +3,12 @@ module github.com/openshift/rbac-permissions-operator
 require (
 	contrib.go.opencensus.io/exporter/ocagent v0.7.0 // indirect
 	git.apache.org/thrift.git v0.12.0 // indirect
-	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
+	github.com/Azure/go-autorest/autorest v0.11.2 // indirect
 	github.com/apache/thrift v0.12.0 // indirect
-	github.com/appscode/jsonpatch v3.0.1+incompatible // indirect
+	github.com/appscode/jsonpatch v0.0.0-20190108182946-7c0e3b262f30 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
 	github.com/coreos/prometheus-operator v0.41.0
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/emicklei/go-restful v2.13.0+incompatible // indirect
-	github.com/evanphx/json-patch v4.0.0+incompatible // indirect
 	github.com/go-logr/zapr v0.1.1 // indirect
 	github.com/go-openapi/spec v0.19.9
 	github.com/go-openapi/swag v0.19.9 // indirect
