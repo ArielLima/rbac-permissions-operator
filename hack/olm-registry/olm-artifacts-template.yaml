@@ -14,7 +14,7 @@ parameters:
 metadata:
   name: selectorsyncset-template
 objects:
-- apiVersion: hive.openshift.io/v1alpha1
+- apiVersion: hive.openshift.io/v1
   kind: SelectorSyncSet
   metadata:
     labels:
@@ -26,14 +26,14 @@ objects:
     clusterDeploymentSelector:
       matchLabels:
         api.openshift.com/managed: 'true'
-    resourceApplyMode: sync
+    resourceApplyMode: Sync
     resources:
     - apiVersion: v1
       kind: Namespace
       metadata:
         name: openshift-rbac-permissions
-      labels:
-        openshift.io/cluster-monitoring: 'true'
+        labels:
+          openshift.io/cluster-monitoring: 'true'
     - apiVersion: rbac.authorization.k8s.io/v1
       kind: Role
       metadata:
@@ -72,6 +72,18 @@ objects:
         namespace: openshift-rbac-permissions
       spec:
         image: ${REGISTRY_IMG}:${CHANNEL}-${IMAGE_TAG}
+        affinity:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - preference:
+                matchExpressions:
+                - key: node-role.kubernetes.io/infra
+                  operator: Exists
+              weight: 1
+        tolerations:
+          - effect: NoSchedule
+            key: node-role.kubernetes.io/infra
+            operator: Exists
         displayName: RBAC Permissions Operator
         icon:
           base64data: ''
