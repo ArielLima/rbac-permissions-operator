@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	clientv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
+	"github.com/openshift/rbac-permissions-operator/pkg/apis/managed/v1alpha1"
 	managedv1alpha1 "github.com/openshift/rbac-permissions-operator/pkg/apis/managed/v1alpha1"
 	controllerutil "github.com/openshift/rbac-permissions-operator/pkg/controller/utils"
 	corev1 "k8s.io/api/core/v1"
@@ -77,6 +79,12 @@ func (r *ReconcileNamespace) Reconcile(request reconcile.Request) (reconcile.Res
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling Namespace")
 
+	// Check on Cluster Operator object
+	reporter = controllerutil.NewStatusReporter(clientv1.ClusterOperatorInterface, v1alpha1.ClusterOperatorName, v1alpha1.ClusterOperatorNamespace, "v4")
+	co, err := reporter.GetOrCreateClusterOperator()
+	if err != nil {
+		return reconcile.Result{}, nil
+	}
 	// Fetch the Namespace instance
 	instance := &corev1.Namespace{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
