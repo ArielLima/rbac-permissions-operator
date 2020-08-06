@@ -1,8 +1,8 @@
 package util
 
 import (
-	"context"
 	"regexp"
+	"strconv"
 
 	apiv1 "github.com/openshift/api/config/v1"
 	clientv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
@@ -196,9 +196,9 @@ func RoleBindingExists(roleBinding *v1.RoleBinding, rbList *v1.RoleBindingList) 
 	return false
 }
 
-// NewStatusReporter returns a status reporter instance
-func NewStatusReporter(client clientv1.ClusterOperatorInterface, name, namespace, version string) *ClusterOperatorClient {
-	return &StatusReporter{
+// NewClusterOperatorClient returns a status reporter instance
+func NewClusterOperatorClient(client clientv1.ClusterOperatorInterface, name, namespace, version string) *ClusterOperatorClient {
+	return &ClusterOperatorClient{
 		client:              client,
 		clusterOperatorName: name,
 		namespace:           namespace,
@@ -208,7 +208,6 @@ func NewStatusReporter(client clientv1.ClusterOperatorInterface, name, namespace
 
 // newClusterOperator will create the cluster operator cr
 func newClusterOperator(clusterOperatorName string, clusterOperatorNamespace string) *apiv1.ClusterOperator {
-	time := metav1.Now()
 	co := &apiv1.ClusterOperator{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "config.openshift.io/v1",
@@ -225,15 +224,14 @@ func newClusterOperator(clusterOperatorName string, clusterOperatorNamespace str
 }
 
 // GetOrCreateClusterOperator will return the cluster operator instance if it exists, error otherwise
-func (c *ClusterOperatorClient) GetOrCreateClusterOperator() (apiv1.ClusterOperator, error) {
+func (c *ClusterOperatorClient) GetOrCreateClusterOperator() (*apiv1.ClusterOperator, error) {
 	// Search for the clusterOperator object in this namespace
-	instance := apiv1.ClusterOperator{}
-	err := c.client.Get(context.TODO(), c.clusterOperatorName, metav1.GetOptions{})
+	instance, err := c.client.Get(c.clusterOperatorName, metav1.GetOptions{})
 	if err != nil {
 		// ClusterOperator CR does not exists, create it
-		err = c.client.Create(context.TODO(), newClusterOperator(c.clusterOperatorName, c.namespace))
+		instance, err = c.client.Create(newClusterOperator(c.clusterOperatorName, c.namespace))
 		if err != nil {
-			return err
+			return instance, err
 		}
 		return instance, managedv1alpha1.ErrReconcileRequeue
 	}
@@ -241,23 +239,33 @@ func (c *ClusterOperatorClient) GetOrCreateClusterOperator() (apiv1.ClusterOpera
 }
 
 // ClusterOperatorUpdateConditions will update the conditions of the cluster operator
-func ClusterOperatorUpdateConditions(client ClusterOperatorClient.client, clusterOperatorNamespace string, clusterOperatorName string, conditions []managedv1alpha1.Condition) error {
+func (c *ClusterOperatorClient) ClusterOperatorUpdateConditions(condition managedv1alpha1.Condition) error {
 	now := metav1.Now()
 
 	// Get clusterOperator cr
-	co, err := GetClusterOperator(client, clusterOperatorNamespace, clusterOperatorName)
+	co, err := c.GetOrCreateClusterOperator()
 	if err != nil {
 		// Failed to retrieve operator, returning error
 		return err
 	}
 
 	// Update clusterOperatorConditions object
-	castOperatorCondition(conditions)
-	co.Status.Conditions = append(co.Status.Conditions, castOperatorCondition(conditions))
+	ocConditions, err := castOperatorCondition(condition, now)
+	co.Status.Conditions = append(co.Status.Conditions, *ocConditions)
+	return nil
 }
 
 // castOperatorCondition will cast subjectPermission conditions into a clusterOperator condition
-func castOperatorCondition(conditions []managedv1alpha1.Condition) error {
+func castOperatorCondition(condition managedv1alpha1.Condition, time metav1.Time) (*apiv1.ClusterOperatorStatusCondition, error) {
 	// Cast condition into
-	return nil
+	co := &apiv1.ClusterOperatorStatusCondition{
+		Status:  castClusterOperatorConditionStatus(condition.Status),
+		Message: condition.Message,
+	}
+	return co, nil
+}
+
+func castClusterOperatorConditionStatus(status bool) apiv1.ConditionStatus {
+	str := strconv.FormatBool(status)
+	return apiv1.ConditionStatus(str)
 }

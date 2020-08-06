@@ -17,7 +17,6 @@ limitations under the License.
 package resourcelock
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,9 +37,9 @@ type LeaseLock struct {
 }
 
 // Get returns the election record from a Lease spec
-func (ll *LeaseLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
+func (ll *LeaseLock) Get() (*LeaderElectionRecord, []byte, error) {
 	var err error
-	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Get(ctx, ll.LeaseMeta.Name, metav1.GetOptions{})
+	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Get(ll.LeaseMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -53,26 +52,26 @@ func (ll *LeaseLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, er
 }
 
 // Create attempts to create a Lease
-func (ll *LeaseLock) Create(ctx context.Context, ler LeaderElectionRecord) error {
+func (ll *LeaseLock) Create(ler LeaderElectionRecord) error {
 	var err error
-	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Create(ctx, &coordinationv1.Lease{
+	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Create(&coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ll.LeaseMeta.Name,
 			Namespace: ll.LeaseMeta.Namespace,
 		},
 		Spec: LeaderElectionRecordToLeaseSpec(&ler),
-	}, metav1.CreateOptions{})
+	})
 	return err
 }
 
 // Update will update an existing Lease spec.
-func (ll *LeaseLock) Update(ctx context.Context, ler LeaderElectionRecord) error {
+func (ll *LeaseLock) Update(ler LeaderElectionRecord) error {
 	if ll.lease == nil {
 		return errors.New("lease not initialized, call get or create first")
 	}
 	ll.lease.Spec = LeaderElectionRecordToLeaseSpec(&ler)
 	var err error
-	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Update(ctx, ll.lease, metav1.UpdateOptions{})
+	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Update(ll.lease)
 	return err
 }
 
@@ -97,24 +96,25 @@ func (ll *LeaseLock) Identity() string {
 }
 
 func LeaseSpecToLeaderElectionRecord(spec *coordinationv1.LeaseSpec) *LeaderElectionRecord {
-	var r LeaderElectionRecord
+	holderIdentity := ""
 	if spec.HolderIdentity != nil {
-		r.HolderIdentity = *spec.HolderIdentity
+		holderIdentity = *spec.HolderIdentity
 	}
+	leaseDurationSeconds := 0
 	if spec.LeaseDurationSeconds != nil {
-		r.LeaseDurationSeconds = int(*spec.LeaseDurationSeconds)
+		leaseDurationSeconds = int(*spec.LeaseDurationSeconds)
 	}
+	leaseTransitions := 0
 	if spec.LeaseTransitions != nil {
-		r.LeaderTransitions = int(*spec.LeaseTransitions)
+		leaseTransitions = int(*spec.LeaseTransitions)
 	}
-	if spec.AcquireTime != nil {
-		r.AcquireTime = metav1.Time{spec.AcquireTime.Time}
+	return &LeaderElectionRecord{
+		HolderIdentity:       holderIdentity,
+		LeaseDurationSeconds: leaseDurationSeconds,
+		AcquireTime:          metav1.Time{spec.AcquireTime.Time},
+		RenewTime:            metav1.Time{spec.RenewTime.Time},
+		LeaderTransitions:    leaseTransitions,
 	}
-	if spec.RenewTime != nil {
-		r.RenewTime = metav1.Time{spec.RenewTime.Time}
-	}
-	return &r
-
 }
 
 func LeaderElectionRecordToLeaseSpec(ler *LeaderElectionRecord) coordinationv1.LeaseSpec {
